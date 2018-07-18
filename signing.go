@@ -17,11 +17,11 @@
 package jose
 
 import (
+	"crypto"
 	"crypto/ecdsa"
 	"crypto/rsa"
 	"errors"
 	"fmt"
-	"crypto"
 	"io"
 )
 
@@ -135,8 +135,8 @@ func makeJWSRecipient(alg SignatureAlgorithm, signingKey interface{}) (recipient
 		recipient.keyID = signingKey.KeyID
 		return recipient, nil
 	default:
-		if _, ok := signingKey.(GenericKey);ok{
-			return newGenericSigner(alg, signingKey.(GenericKey))
+		if _, ok := signingKey.(GenericSigningKey); ok {
+			return newGenericSigner(alg, signingKey.(GenericSigningKey))
 		}
 		return recipientSigInfo{}, ErrUnsupportedKeyType
 	}
@@ -150,7 +150,7 @@ const (
 
 type SignerOpts map[interface{}]interface{}
 
-func (opts SignerOpts) HashFunc () crypto.Hash {
+func (opts SignerOpts) HashFunc() crypto.Hash {
 	if hf, ok := opts[HashFunc]; ok {
 		if hf, ok := hf.(crypto.Hash); ok {
 			return hf
@@ -159,18 +159,28 @@ func (opts SignerOpts) HashFunc () crypto.Hash {
 	return crypto.Hash(0)
 }
 
-type GenericKey interface {
-	RandReader() io.Reader
+type GenericSigningKey interface {
 	PublicKey() *JsonWebKey
-	SignPayload(rand io.Reader, digest []byte, opts SignerOpts) (signature []byte, err error)
+	RandReader() io.Reader
+	Sign(rand io.Reader, digest []byte, opts SignerOpts) (signature []byte, err error)
 }
 
-type genericSigningKey struct{
-	genericKey GenericKey
+type genericSigningKey struct {
+	genericKey GenericSigningKey
 }
 
-func (key *genericSigningKey)signPayload(payload []byte, alg SignatureAlgorithm) (Signature, error) {
-	signature := Signature{protected:&rawHeader{}}
+type GenericVerifyingKey interface {
+	PublicKey() *JsonWebKey
+	RandReader() io.Reader
+	Sign(rand io.Reader, digest []byte, opts SignerOpts) (signature []byte, err error)
+}
+
+type genericVerifingKey struct {
+	genericKey GenericVerifyingKey
+}
+
+func (key *genericSigningKey) signPayload(payload []byte, alg SignatureAlgorithm) (Signature, error) {
+	signature := Signature{protected: &rawHeader{}}
 	var err error
 	signingOpts := SignerOpts{}
 	switch alg {
@@ -188,16 +198,16 @@ func (key *genericSigningKey)signPayload(payload []byte, alg SignatureAlgorithm)
 		return signature, err
 	}
 	digest := hasher.Sum(nil)
-	if signature.Signature, err = key.genericKey.SignPayload(key.genericKey.RandReader(), digest, signingOpts); err != nil{
+	if signature.Signature, err = key.genericKey.Sign(key.genericKey.RandReader(), digest, signingOpts); err != nil {
 		return signature, err
 	}
 	return signature, nil
 }
-func newGenericSigner(sigAlg SignatureAlgorithm, signingKey GenericKey) (recipientSigInfo, error) {
+func newGenericSigner(sigAlg SignatureAlgorithm, signingKey GenericSigningKey) (recipientSigInfo, error) {
 	return recipientSigInfo{
-		sigAlg: sigAlg,
+		sigAlg:    sigAlg,
 		publicKey: signingKey.PublicKey(),
-		signer: &genericSigningKey{genericKey:signingKey},
+		signer:    &genericSigningKey{genericKey: signingKey},
 	}, nil
 }
 

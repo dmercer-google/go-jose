@@ -25,9 +25,9 @@ import (
 	"io"
 	"testing"
 
+	"encoding/asn1"
 	"github.com/square/go-jose/json"
 	"math/big"
-	"encoding/asn1"
 )
 
 type staticNonceSource string
@@ -452,31 +452,32 @@ func TestSignerWithJWKAndKeyID(t *testing.T) {
 	}
 }
 
-type fakeGenericKey struct{
+type fakeGenericKey struct {
 	privateKey *ecdsa.PrivateKey
 }
-func (fgk fakeGenericKey)RandReader() io.Reader{
+
+func (fgk fakeGenericKey) RandReader() io.Reader {
 	return rand.Reader
 }
 
-func (fgk fakeGenericKey)SignPayload(rand io.Reader, digest []byte, opts SignerOpts) (signature []byte, err error){
+func (fgk fakeGenericKey) SignPayload(rand io.Reader, digest []byte, opts SignerOpts) (signature []byte, err error) {
 
-	if sig, err := fgk.privateKey.Sign(fgk.RandReader(), digest, opts); err == nil{
+	if sig, err := fgk.privateKey.Sign(fgk.RandReader(), digest, opts); err == nil {
 		return fmtEcdsaSig(sig)
 	}
 	return
 }
 
-func (fgk fakeGenericKey)PublicKey() *JsonWebKey{
+func (fgk fakeGenericKey) PublicKey() *JsonWebKey {
 	return &JsonWebKey{Key: fgk.privateKey.Public()}
 }
 
-func fmtEcdsaSig(asn1Sig []byte) (rsSig []byte, err error){
+func fmtEcdsaSig(asn1Sig []byte) (rsSig []byte, err error) {
 	type ecSig struct {
 		R, S *big.Int
 	}
 	unmarshalledSig := ecSig{}
-	if _, err := asn1.Unmarshal(asn1Sig, &unmarshalledSig);err != nil{
+	if _, err := asn1.Unmarshal(asn1Sig, &unmarshalledSig); err != nil {
 		return nil, err
 	}
 	rsSig = append(unmarshalledSig.R.Bytes(), unmarshalledSig.S.Bytes()...)
@@ -485,7 +486,6 @@ func fmtEcdsaSig(asn1Sig []byte) (rsSig []byte, err error){
 
 func TestSignerWithGenericKey(t *testing.T) {
 	pvtKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	k(fakeGenericKey{privateKey: pvtKey})
 	if signer, err := NewSigner(ES256, fakeGenericKey{privateKey: pvtKey}); err != nil {
 		t.Errorf("error creating signer: %q", err)
 	} else if jws, err := signer.Sign([]byte("test")); err != nil {
@@ -494,17 +494,7 @@ func TestSignerWithGenericKey(t *testing.T) {
 		t.Errorf("error compact serializing: %q", err)
 	} else if jws, err := ParseSigned(compactSerialized); err != nil {
 		t.Errorf("error parsing token: %q", err)
-	} else if payload, err := jws.Verify(pvtKey.Public());err != nil {
+	} else if _, err := jws.Verify(pvtKey.Public()); err != nil {
 		t.Fatalf("Error Verifying token: %s", err)
-	} else {
-		println(string(payload))
-		println(compactSerialized)
-		println(string(jws.payload))
-		println(jws.FullSerialize())
 	}
 }
-
-func k(d GenericKey){
-	println(true)
-}
-
