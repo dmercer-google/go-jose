@@ -17,12 +17,10 @@
 package jose
 
 import (
-	"crypto"
 	"crypto/ecdsa"
 	"crypto/rsa"
 	"errors"
 	"fmt"
-	"io"
 )
 
 // NonceSource represents a source of random nonces to go into JWS objects
@@ -105,6 +103,9 @@ func newVerifier(verificationKey interface{}) (payloadVerifier, error) {
 	case *JsonWebKey:
 		return newVerifier(verificationKey.Key)
 	default:
+		if vk, ok := verificationKey.(AbstractVerifier); ok {
+			return newAbstractVerifier(vk)
+		}
 		return nil, ErrUnsupportedKeyType
 	}
 }
@@ -135,80 +136,11 @@ func makeJWSRecipient(alg SignatureAlgorithm, signingKey interface{}) (recipient
 		recipient.keyID = signingKey.KeyID
 		return recipient, nil
 	default:
-		if _, ok := signingKey.(GenericSigningKey); ok {
-			return newGenericSigner(alg, signingKey.(GenericSigningKey))
+		if sk, ok := signingKey.(AbstractSigner); ok {
+			return newAbstractSigner(alg, sk.(AbstractSigner))
 		}
 		return recipientSigInfo{}, ErrUnsupportedKeyType
 	}
-}
-
-type SigningOptions uint
-
-const (
-	HashFunc SigningOptions = 1 + iota
-)
-
-type SignerOpts map[interface{}]interface{}
-
-func (opts SignerOpts) HashFunc() crypto.Hash {
-	if hf, ok := opts[HashFunc]; ok {
-		if hf, ok := hf.(crypto.Hash); ok {
-			return hf
-		}
-	}
-	return crypto.Hash(0)
-}
-
-type GenericSigningKey interface {
-	PublicKey() *JsonWebKey
-	RandReader() io.Reader
-	Sign(rand io.Reader, digest []byte, opts SignerOpts) (signature []byte, err error)
-}
-
-type genericSigningKey struct {
-	genericKey GenericSigningKey
-}
-
-type GenericVerifyingKey interface {
-	PublicKey() *JsonWebKey
-	RandReader() io.Reader
-	Sign(rand io.Reader, digest []byte, opts SignerOpts) (signature []byte, err error)
-}
-
-type genericVerifingKey struct {
-	genericKey GenericVerifyingKey
-}
-
-func (key *genericSigningKey) signPayload(payload []byte, alg SignatureAlgorithm) (Signature, error) {
-	signature := Signature{protected: &rawHeader{}}
-	var err error
-	signingOpts := SignerOpts{}
-	switch alg {
-	case HS256, RS256, ES256, PS256:
-		signingOpts[HashFunc] = crypto.SHA256
-	case HS384, RS384, ES384, PS384:
-		signingOpts[HashFunc] = crypto.SHA384
-	case HS512, RS512, ES512, PS512:
-		signingOpts[HashFunc] = crypto.SHA512
-	default:
-		return signature, ErrUnsupportedAlgorithm
-	}
-	hasher := signingOpts.HashFunc().New()
-	if _, err = hasher.Write(payload); err != nil {
-		return signature, err
-	}
-	digest := hasher.Sum(nil)
-	if signature.Signature, err = key.genericKey.Sign(key.genericKey.RandReader(), digest, signingOpts); err != nil {
-		return signature, err
-	}
-	return signature, nil
-}
-func newGenericSigner(sigAlg SignatureAlgorithm, signingKey GenericSigningKey) (recipientSigInfo, error) {
-	return recipientSigInfo{
-		sigAlg:    sigAlg,
-		publicKey: signingKey.PublicKey(),
-		signer:    &genericSigningKey{genericKey: signingKey},
-	}, nil
 }
 
 func (ctx *genericSigner) Sign(payload []byte) (*JsonWebSignature, error) {
