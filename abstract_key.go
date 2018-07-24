@@ -16,12 +16,15 @@
 
 package jose
 
-// When implemented, allows keys that are not natively supported by Golang or go-jose to be used for signing operations.
+// When implemented, allows key types and signing algorithms that are not natively supported by Golang or go-jose to be
+// used for signing operations.
+//
 // Examples of such keys include those implemented by PKCS11 providers, native keys where a non native entropy source
 // must be used to generate signatures, etc.
 //
-// In the case where the signing requires specific option values (e.g. PSS Salt Length) it is the responsibility of the
-// implementer to handle these properly in the implementation of the SignPayload function.
+// In the case where the signing requires specific option values (e.g. PSS Salt Length, etc.) it is the responsibility
+// of the implementer to handle these properly in the constructor of the concrete implementation of AbstractKey and in
+// its implementation of the SignPayload function.
 type AbstractSigner interface {
 	// The Key Identifier of the key to be inserted into the `kid` claim of the jose header.
 	KeyID() string
@@ -30,6 +33,7 @@ type AbstractSigner interface {
 	SignPayload(payload []byte, algorithm SignatureAlgorithm) (signature []byte, err error)
 }
 
+// Used in signing.go to provide implement the functions of the payloadSigner interface
 type abstractSigner struct {
 	signer AbstractSigner
 }
@@ -50,12 +54,19 @@ func (ctx *abstractSigner) signPayload(payload []byte, algorithm SignatureAlgori
 	return
 }
 
-// When implemented, allows keys not natively supported by Golang or go-jose to be used to verify signatures.
-// Examples of such keys include those implemented by PKCS11 providers, etc.
+// When implemented, allows key types and verification algorithms that are not natively supported by Golang or go-jose
+// to be used for signature verification operatins operations.
+// Examples of such keys include those implemented by PKCS11 providers, native keys where a non native entropy source
+// must be used to generate signatures, etc.
+//
+// In the case where the verifivation requires specific option values it is the responsibility of the implementer to
+// handle these properly in the constructor of the concrete implementation of AbstractKey and in its implementation of
+// the Verify function.
 type AbstractVerifier interface {
 	Verify(payload []byte, signature []byte, algorithm SignatureAlgorithm) error
 }
 
+// Used in signing.go to provide implement the functions of the payloadVerifier interface
 type abstractVerifier struct {
 	abstractVerifier AbstractVerifier
 }
