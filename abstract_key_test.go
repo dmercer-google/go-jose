@@ -32,7 +32,7 @@ var WrongKey = []byte{0x06, 0x07, 0x08}
 
 var serialized string
 
-func TestXorSignWithAbstractVerifier(t *testing.T) {
+func TesSignWithAbstractSigner(t *testing.T) {
 	payload := []byte(JwsPayload)
 	key, _ := NewXorTestKey(Key)
 	if signer, err := NewSigner(PS256, key); err != nil {
@@ -70,10 +70,10 @@ func TestXorSignWithAbstractVerifier(t *testing.T) {
 	}
 }
 
-func TestXorVerifyWithAbstractVerifier(t *testing.T) {
+func TestVerifyWithAbstractVerifier(t *testing.T) {
 	// Pre create the compact serialized token if needed
 	if serialized == "" {
-		TestXorSignWithAbstractVerifier(t)
+		TesSignWithAbstractSigner(t)
 	}
 
 	key, _ := NewXorTestKey(Key)
