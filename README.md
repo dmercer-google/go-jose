@@ -107,10 +107,15 @@ allows attaching a key id.
  ECDH, ECDSA                | *[ecdsa.PublicKey](http://golang.org/pkg/crypto/ecdsa/#PublicKey), *[ecdsa.PrivateKey](http://golang.org/pkg/crypto/ecdsa/#PrivateKey)
  AES, HMAC                  | []byte
 
-Additional key types non-native to Go or go-jose as well as non standard signing algorithms can be supported by implementing the following interfaces:
+Additional key types non-native to Go or go-jose as well as non natively supported 
+signing behaviors can be implemented using the following interfaces:
 
 * *[jose.AbstractSigner](https://godoc.org/gopkg.in/square/go-jose.v2#AbstractSigner)
-* *[jose.AbstractVerifier](https://godoc.org/gopkg.in/square/go-jose.v2#AbstractEncryptor) 
+* *[jose.AbstractVerifier](https://godoc.org/gopkg.in/square/go-jose.v2#AbstractVerifier) 
+
+These interfaces can also be used to leverage entropy sources other than 
+[crypto/rand.Reader](http://golang.org/pkg/crypto/rand) as well as algorithms, 
+curves, etc. that are not natively supported by go and go-jose.
 
 ## Examples
 
